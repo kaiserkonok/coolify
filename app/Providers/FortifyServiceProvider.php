@@ -47,12 +47,18 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            // Allow access to register page if OAuth-only is enabled (for OAuth self-registration)
+            // But show message that password registration is disabled
+            if (! $settings->is_registration_enabled && ! $settings->is_oauth_only) {
                 return redirect()->route('login');
             }
 
+            $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
+
             return view('auth.register', [
                 'isFirstUser' => $isFirstUser,
+                'is_oauth_only' => $settings->is_oauth_only ?? false,
+                'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
 
@@ -67,11 +73,18 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_oauth_only' => $settings->is_oauth_only ?? false,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
 
         Fortify::authenticateUsing(function (Request $request) {
+            $settings = instanceSettings();
+            // Block password login when OAuth-only mode is enabled
+            if ($settings->is_oauth_only) {
+                return null;
+            }
+
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
             if (
