@@ -15,6 +15,9 @@ class Advanced extends Component
     public bool $is_registration_enabled;
 
     #[Validate('boolean')]
+    public bool $is_oauth_only;
+
+    #[Validate('boolean')]
     public bool $do_not_track;
 
     #[Validate('boolean')]
@@ -37,10 +40,13 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
+    public bool $has_oauth_providers = false;
+
     public function rules()
     {
         return [
             'is_registration_enabled' => 'boolean',
+            'is_oauth_only' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
             'custom_dns_servers' => 'nullable|string',
@@ -62,17 +68,29 @@ class Advanced extends Component
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->is_oauth_only = $this->settings->is_oauth_only ?? false;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
+        $this->has_oauth_providers = \App\Models\OauthSetting::where('enabled', true)->count() > 0;
     }
 
     public function submit()
     {
         try {
             $this->validate();
+
+            // Prevent enabling OAuth-only if no OAuth providers are configured
+            if ($this->is_oauth_only) {
+                $oauthProviders = \App\Models\OauthSetting::where('enabled', true)->count();
+                if ($oauthProviders === 0) {
+                    $this->dispatch('error', 'Cannot enable OAuth-only mode: No OAuth providers are configured. Please configure at least one OAuth provider first.');
+
+                    return;
+                }
+            }
 
             $this->custom_dns_servers = str($this->custom_dns_servers)->replaceEnd(',', '')->trim();
             $this->custom_dns_servers = str($this->custom_dns_servers)->trim()->explode(',')->map(function ($dns) {
@@ -142,6 +160,7 @@ class Advanced extends Component
     {
         try {
             $this->settings->is_registration_enabled = $this->is_registration_enabled;
+            $this->settings->is_oauth_only = $this->is_oauth_only;
             $this->settings->do_not_track = $this->do_not_track;
             $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
             $this->settings->custom_dns_servers = $this->custom_dns_servers;
