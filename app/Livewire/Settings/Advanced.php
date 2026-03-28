@@ -40,6 +40,8 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
+    public bool $has_oauth_providers = false;
+
     public function rules()
     {
         return [
@@ -72,12 +74,23 @@ class Advanced extends Component
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
+        $this->has_oauth_providers = \App\Models\OauthSetting::where('enabled', true)->count() > 0;
     }
 
     public function submit()
     {
         try {
             $this->validate();
+
+            // Prevent enabling OAuth-only if no OAuth providers are configured
+            if ($this->is_oauth_only) {
+                $oauthProviders = \App\Models\OauthSetting::where('enabled', true)->count();
+                if ($oauthProviders === 0) {
+                    $this->dispatch('error', 'Cannot enable OAuth-only mode: No OAuth providers are configured. Please configure at least one OAuth provider first.');
+
+                    return;
+                }
+            }
 
             $this->custom_dns_servers = str($this->custom_dns_servers)->replaceEnd(',', '')->trim();
             $this->custom_dns_servers = str($this->custom_dns_servers)->trim()->explode(',')->map(function ($dns) {

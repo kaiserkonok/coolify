@@ -26,6 +26,13 @@
                             helper="Only allow login via OAuth providers. When enabled, password-based login and registration will be disabled. OAuth users can still self-register even if registration is disabled. Useful for organizations using OAuth providers like Authentik or Google Workspace to control access."
                             label="OAuth Only Mode" />
                     </div>
+                    @if ($is_oauth_only && !$has_oauth_providers)
+                        <div class="md:w-96">
+                            <x-callout type="danger" title="Warning" class="mt-2">
+                                OAuth-only mode is enabled but no OAuth providers are configured. You will be locked out of your Coolify instance!
+                            </x-callout>
+                        </div>
+                    @endif
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
